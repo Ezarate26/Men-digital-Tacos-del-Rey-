@@ -15,7 +15,7 @@ export default function Home() {
         <div className="w-20 h-px bg-[#c9a45c] mx-auto my-6" />
 
         <p className="text-neutral-400">
-          Escanea el código de tu mesa o abre la carta digital.
+          Escanea el código de tu mesa para visualizar el menú.
         </p>
 
         <Link

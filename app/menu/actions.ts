@@ -14,7 +14,7 @@ export async function requestAttention(
     return {
       status: "error",
       message:
-        "Escanea el código QR de tu mesa para que el mesero sepa dónde estás.",
+        "Escanea el código QR de tu mesa para visualizar el menú.",
     };
   }
 

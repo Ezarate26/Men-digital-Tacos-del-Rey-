@@ -117,7 +117,7 @@ function TableNotice({ table }: { table: MenuTableState }) {
 
   return (
     <p className="menu-note">
-      Estás viendo el menú general. Escanea el QR de tu mesa para llamar al mesero.
+      Estás viendo el menú general.
     </p>
   );
 }
