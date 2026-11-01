@@ -7,12 +7,15 @@ import {
   SubmitButton,
   TextField,
 } from "@/components/admin/forms";
-import { PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { AccessDenied, PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { allowedPage } from "@/lib/admin/access";
 import { isMissingSchema } from "@/lib/admin/validation";
 import { createClient } from "@/lib/supabase/server";
 import { createSection, deleteSection, moveSection, updateSection } from "./actions";
 
 export default async function SeccionesPage() {
+  if ((await allowedPage("categories.view")) === "no") return <AccessDenied title="Secciones" />;
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("menu_sections")

@@ -1,3 +1,5 @@
+import type { MenuTheme } from "@/lib/menu/theme";
+
 export type MenuProduct = {
   id: string;
   name: string;
@@ -24,11 +26,7 @@ export type PublicMenu = {
   menuAvailable: boolean;
   sections: MenuSection[];
   table: MenuTableState;
-  brand: {
-    name: string;
-    eyebrow: string;
-    logoUrl: string | null;
-  };
+  theme: MenuTheme;
 };
 
 export type AttentionState = {

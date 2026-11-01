@@ -3,28 +3,68 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import {
+  BarChart3,
+  LayoutDashboard,
+  LogOut,
+  Palette,
+  QrCode,
+  Settings,
+  UserRound,
+  Users,
+  UtensilsCrossed,
+  Bell,
+  Layers,
+} from "lucide-react";
 import { logout } from "@/app/admin/login/actions";
+import type { Permission } from "@/lib/auth/permissions";
 
-const links = [
-  { href: "/admin", label: "Resumen" },
-  { href: "/admin/productos", label: "Productos" },
-  { href: "/admin/secciones", label: "Secciones del menú" },
-  { href: "/admin/diseno", label: "Diseño y branding" },
-  { href: "/admin/mesas", label: "Mesas" },
-  { href: "/admin/meseros", label: "Meseros" },
-  { href: "/admin/solicitudes", label: "Solicitudes de atención" },
-  { href: "/admin/estadisticas", label: "Estadísticas" },
-  { href: "/admin/usuarios", label: "Usuarios" },
-  { href: "/admin/configuracion", label: "Configuración" },
+const links: Array<{
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  permission?: Permission;
+  anyOf?: Permission[];
+  ownerOnly?: boolean;
+}> = [
+  { href: "/admin", label: "Resumen", icon: LayoutDashboard, permission: "dashboard.view" },
+  { href: "/admin/productos", label: "Productos", icon: UtensilsCrossed, permission: "products.view" },
+  { href: "/admin/secciones", label: "Secciones del menú", icon: Layers, permission: "categories.view" },
+  {
+    href: "/admin/diseno",
+    label: "Diseño y branding",
+    icon: Palette,
+    anyOf: ["branding.view", "branding.update", "branding.publish"],
+  },
+  {
+    href: "/admin/mesas",
+    label: "Mesas",
+    icon: QrCode,
+    anyOf: ["tables.view", "tables.manage_qr"],
+  },
+  { href: "/admin/meseros", label: "Meseros", icon: UserRound, ownerOnly: true },
+  { href: "/admin/solicitudes", label: "Solicitudes de atención", icon: Bell, ownerOnly: true },
+  { href: "/admin/estadisticas", label: "Estadísticas", icon: BarChart3, permission: "analytics.view" },
+  { href: "/admin/usuarios", label: "Usuarios", icon: Users, permission: "users.view" },
+  {
+    href: "/admin/configuracion",
+    label: "Configuración",
+    icon: Settings,
+    anyOf: ["menu.view", "menu.publish"],
+  },
 ];
 
 export function AdminShell({
   email,
   name,
+  mode,
+  permissions,
   children,
 }: {
   email: string;
   name: string;
+  mode: "owner" | "collaborator";
+  permissions: Permission[];
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -40,23 +80,25 @@ export function AdminShell({
           <p className="mt-1 text-sm text-foreground/70">Administración</p>
         </div>
         <nav className="flex flex-col gap-1 px-3 pb-4">
-          {links.map((link) => {
+          {links.filter((link) => linkVisible(link, mode, permissions)).map((link) => {
             const active =
               link.href === "/admin"
                 ? pathname === "/admin"
                 : pathname.startsWith(link.href);
+            const Icon = link.icon;
 
             return (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setOpen(false)}
-                className={`rounded-xl px-3 py-2 text-sm ${
+                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
                   active
                     ? "bg-gold text-black"
                     : "text-foreground/80 hover:bg-black/40"
                 }`}
               >
+                <Icon size={16} aria-hidden="true" />
                 {link.label}
               </Link>
             );
@@ -66,7 +108,8 @@ export function AdminShell({
           <p className="text-sm text-foreground">{name || "Propietario"}</p>
           <p className="truncate text-xs text-foreground/60">{email}</p>
           <form action={logout} className="mt-3">
-            <button type="submit" className="text-sm tracking-wide text-gold">
+            <button type="submit" className="inline-flex items-center gap-2 text-sm tracking-wide text-gold">
+              <LogOut size={16} aria-hidden="true" />
               Cerrar sesión
             </button>
           </form>
@@ -84,10 +127,30 @@ export function AdminShell({
             {open ? "Cerrar" : "Menú"}
           </button>
         </header>
-        <div className="mx-auto w-full max-w-5xl px-4 py-6 md:px-8">{children}</div>
+        <div
+          className={
+            pathname.startsWith("/admin/diseno")
+              ? "w-full px-4 py-6 md:px-6"
+              : "mx-auto w-full max-w-5xl px-4 py-6 md:px-8"
+          }
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
+}
+
+function linkVisible(
+  link: (typeof links)[number],
+  mode: "owner" | "collaborator",
+  permissions: Permission[],
+) {
+  if (mode === "owner") return true;
+  if (link.ownerOnly) return false;
+  if (link.anyOf) return link.anyOf.some((permission) => permissions.includes(permission));
+  if (link.permission) return permissions.includes(link.permission);
+  return false;
 }
 
 export function PageIntro({
@@ -111,6 +174,15 @@ export function SchemaNotice() {
       Falta aplicar las migraciones en Supabase. Ejecuta, en orden, los archivos
       de <span className="text-gold">supabase/migrations</span> desde el SQL Editor.
     </p>
+  );
+}
+
+export function AccessDenied({ title }: { title: string }) {
+  return (
+    <PageIntro
+      title={title}
+      description="No tienes permiso para abrir este apartado."
+    />
   );
 }
 

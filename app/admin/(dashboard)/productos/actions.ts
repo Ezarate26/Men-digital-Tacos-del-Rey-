@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { assertOwner } from "@/lib/admin/access";
+import { assertPermission, getAccessContext } from "@/lib/admin/access";
 import { readMenuImage, removeMenuImage, uploadMenuImage } from "@/lib/admin/media";
 import type { ActionState } from "@/lib/admin/types";
 import {
@@ -30,7 +30,7 @@ export async function createProduct(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  if (!(await assertOwner())) return denied;
+  if (!(await assertPermission("products.create"))) return denied;
 
   const parsed = readProduct(formData);
   if (!parsed.ok) return { status: "error", message: parsed.message };
@@ -65,7 +65,19 @@ export async function updateProduct(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  if (!(await assertOwner())) return denied;
+  const access = await getAccessContext();
+  const allows = (permission: "products.update" | "products.update_price" | "products.update_availability" | "products.upload_images") =>
+    access.kind === "owner" ||
+    (access.kind === "collaborator" && access.permissions.includes(permission));
+
+  if (
+    !allows("products.update") &&
+    !allows("products.update_price") &&
+    !allows("products.update_availability") &&
+    !allows("products.upload_images")
+  ) {
+    return denied;
+  }
 
   const id = String(formData.get("id") ?? "");
   if (!isUuid(id)) return { status: "error", message: "Producto no válido." };
@@ -92,10 +104,59 @@ export async function updateProduct(
     imageUrl = uploaded.url;
   }
 
-  const { error } = await supabase
-    .from("products")
-    .update({ ...parsed.value, image_url: imageUrl })
-    .eq("id", id);
+  const fullUpdate = allows("products.update");
+  let error: { code?: string; message?: string } | null = null;
+
+  if (fullUpdate) {
+    const updated = await supabase
+      .from("products")
+      .update({ ...parsed.value, image_url: imageUrl })
+      .eq("id", id);
+    error = updated.error;
+  } else {
+    const currentProduct = await supabase
+      .from("products")
+      .select("name, description, price_cents, section_id, is_available, is_active, is_featured, sort_order, image_url")
+      .eq("id", id)
+      .maybeSingle();
+    const row = currentProduct.data;
+
+    if (!row) return { status: "error", message: "No encontramos el producto." };
+
+    const structuralChange =
+      row.name !== parsed.value.name ||
+      (row.description ?? "") !== parsed.value.description ||
+      row.section_id !== parsed.value.section_id ||
+      row.is_active !== parsed.value.is_active ||
+      row.is_featured !== parsed.value.is_featured ||
+      row.sort_order !== parsed.value.sort_order;
+
+    if (
+      structuralChange ||
+      (row.price_cents !== parsed.value.price_cents && !allows("products.update_price")) ||
+      (row.is_available !== parsed.value.is_available && !allows("products.update_availability")) ||
+      (uploadedUrl && !allows("products.upload_images"))
+    ) {
+      await removeMenuImage(supabase, uploadedUrl);
+      return denied;
+    }
+
+    if (row.price_cents !== parsed.value.price_cents) {
+      const priced = await supabase.rpc("set_product_price", { p_id: id, p_cents: parsed.value.price_cents });
+      error = priced.error;
+    }
+    if (!error && row.is_available !== parsed.value.is_available) {
+      const available = await supabase.rpc("set_product_availability", {
+        p_id: id,
+        p_available: parsed.value.is_available,
+      });
+      error = available.error;
+    }
+    if (!error && uploadedUrl) {
+      const imaged = await supabase.rpc("set_product_image", { p_id: id, p_url: imageUrl });
+      error = imaged.error;
+    }
+  }
 
   if (error) {
     await removeMenuImage(supabase, uploadedUrl);
@@ -111,7 +172,7 @@ export async function deleteProduct(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  if (!(await assertOwner())) return denied;
+  if (!(await assertPermission("products.delete"))) return denied;
 
   const id = String(formData.get("id") ?? "");
   if (!isUuid(id)) return { status: "error", message: "Producto no válido." };
@@ -131,7 +192,7 @@ export async function moveProduct(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  if (!(await assertOwner())) return denied;
+  if (!(await assertPermission("products.update"))) return denied;
 
   const id = String(formData.get("id") ?? "");
   const sectionId = String(formData.get("section_id") ?? "");

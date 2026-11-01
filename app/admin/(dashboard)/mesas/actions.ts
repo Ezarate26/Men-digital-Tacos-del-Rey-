@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { assertOwner } from "@/lib/admin/access";
+import { assertPermission } from "@/lib/admin/access";
 import type { ActionState } from "@/lib/admin/types";
 import {
   databaseMessage,
@@ -27,7 +27,7 @@ export async function createTable(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  if (!(await assertOwner())) return denied;
+  if (!(await assertPermission("tables.create"))) return denied;
   const parsed = readTable(formData);
   if (!parsed.ok) return { status: "error", message: parsed.message };
 
@@ -43,7 +43,7 @@ export async function updateTable(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  if (!(await assertOwner())) return denied;
+  if (!(await assertPermission("tables.update"))) return denied;
 
   const id = String(formData.get("id") ?? "");
   if (!isUuid(id)) return { status: "error", message: "Mesa no válida." };

@@ -46,9 +46,11 @@ export function BoundForm({
 export function SubmitButton({
   children,
   tone = "solid",
+  pendingLabel = "Guardando...",
 }: {
   children: React.ReactNode;
   tone?: "solid" | "ghost";
+  pendingLabel?: string;
 }) {
   const { pending } = useFormStatus();
 
@@ -62,7 +64,7 @@ export function SubmitButton({
           : "rounded-full border border-gold/40 px-4 py-2 text-sm tracking-wide text-gold-light disabled:opacity-60"
       }
     >
-      {pending ? "Guardando..." : children}
+      {pending ? pendingLabel : children}
     </button>
   );
 }

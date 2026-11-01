@@ -1,5 +1,7 @@
 import { createPublicClient } from "@/lib/supabase/public";
 import { readTableCode } from "@/lib/menu/table-code";
+import { coerceTheme, CURRENT_BUSINESS_SLUG, themeFromLegacyBrand } from "@/lib/menu/theme";
+import type { MenuTheme } from "@/lib/menu/theme";
 import type { MenuProduct, MenuSection, PublicMenu } from "@/lib/menu/types";
 
 type ProductRow = {
@@ -45,6 +47,10 @@ export async function getPublicMenu(
     .eq("id", 1)
     .maybeSingle();
 
+  const themeQuery = supabase.rpc("published_menu_theme", {
+    business_slug: CURRENT_BUSINESS_SLUG,
+  });
+
   const tableQuery =
     tableInput.kind === "code"
       ? supabase
@@ -55,10 +61,11 @@ export async function getPublicMenu(
           .maybeSingle()
       : null;
 
-  const [sectionsResult, settingsResult, tableResult] = await Promise.all([
+  const [sectionsResult, settingsResult, tableResult, themeResult] = await Promise.all([
     sectionsQuery,
     settingsQuery,
     tableQuery,
+    themeQuery,
   ]);
 
   const failure = sectionsResult.error ?? settingsResult.error ?? tableResult?.error;
@@ -99,7 +106,7 @@ export async function getPublicMenu(
       menuAvailable: settingsResult.data?.menu_available === true,
       sections,
       table,
-      brand: readBrand(settingsResult.data),
+      theme: resolveTheme(themeResult.error ? null : themeResult.data, settingsResult.data),
     },
   };
 }
@@ -153,6 +160,10 @@ async function getPublicMenuWithoutNewColumns(
           .maybeSingle()
       : null;
 
+  const themeResult = await supabase.rpc("published_menu_theme", {
+    business_slug: CURRENT_BUSINESS_SLUG,
+  });
+
   const failure = sectionsResult.error ?? settingsResult.error ?? tableResult?.error;
 
   if (failure) {
@@ -182,25 +193,26 @@ async function getPublicMenuWithoutNewColumns(
       menuAvailable: settingsResult.data?.menu_available === true,
       sections: ((sectionsResult.data ?? []) as unknown as SectionRow[]).map(mapSection),
       table,
-      brand: {
-        name: "Tacos del Rey",
-        eyebrow: "TAQUERÍA",
-        logoUrl: null,
-      },
+      theme: resolveTheme(themeResult.error ? null : themeResult.data, null),
     },
   };
 }
 
-function readBrand(settings: {
-  display_name?: string | null;
-  tagline?: string | null;
-  logo_url?: string | null;
-} | null) {
-  return {
-    name: settings?.display_name?.trim() || "Tacos del Rey",
-    eyebrow: settings?.tagline?.trim() || "TAQUERÍA",
-    logoUrl: settings?.logo_url?.trim() || null,
-  };
+function resolveTheme(
+  payload: unknown,
+  settings: {
+    display_name?: string | null;
+    tagline?: string | null;
+    logo_url?: string | null;
+  } | null,
+): MenuTheme {
+  if (payload) return coerceTheme(payload);
+
+  return themeFromLegacyBrand({
+    name: settings?.display_name,
+    eyebrow: settings?.tagline,
+    logoUrl: settings?.logo_url,
+  });
 }
 
 function mapSection(row: SectionRow): MenuSection {

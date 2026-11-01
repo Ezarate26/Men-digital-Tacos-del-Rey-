@@ -8,7 +8,8 @@ import {
   SubmitButton,
   TextField,
 } from "@/components/admin/forms";
-import { PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { AccessDenied, PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { allowedPage } from "@/lib/admin/access";
 import { centsToPriceInput } from "@/lib/admin/validation";
 import { isMissingSchema } from "@/lib/admin/validation";
 import { formatPrice } from "@/lib/menu/format";
@@ -21,6 +22,8 @@ import {
 } from "./actions";
 
 export default async function ProductosPage() {
+  if ((await allowedPage("products.view")) === "no") return <AccessDenied title="Productos" />;
+
   const supabase = await createClient();
   const [productsResult, sectionsResult] = await Promise.all([
     supabase

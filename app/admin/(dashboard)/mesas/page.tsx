@@ -5,7 +5,8 @@ import {
   SubmitButton,
   TextField,
 } from "@/components/admin/forms";
-import { PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { AccessDenied, PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { allowedPage } from "@/lib/admin/access";
 import { QrTools } from "@/components/admin/qr-tools";
 import { resolvePublicOrigin } from "@/lib/admin/origin";
 import { isMissingSchema } from "@/lib/admin/validation";
@@ -13,6 +14,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createTable, updateTable } from "./actions";
 
 export default async function MesasPage() {
+  if ((await allowedPage(["tables.view", "tables.manage_qr"])) === "no") {
+    return <AccessDenied title="Mesas" />;
+  }
+
   const supabase = await createClient();
   const [tablesResult, settingsResult] = await Promise.all([
     supabase

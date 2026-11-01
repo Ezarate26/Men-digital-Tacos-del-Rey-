@@ -1,7 +1,10 @@
-import { PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { AccessDenied, PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { allowedPage } from "@/lib/admin/access";
 import { loadDashboardCounts } from "@/lib/admin/counts";
 
 export default async function EstadisticasPage() {
+  if ((await allowedPage("analytics.view")) === "no") return <AccessDenied title="Estadísticas" />;
+
   const result = await loadDashboardCounts();
 
   if (!result.ok && result.reason === "schema") {

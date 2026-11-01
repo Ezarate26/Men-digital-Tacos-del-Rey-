@@ -1,7 +1,10 @@
-import { PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { AccessDenied, PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { allowedPage } from "@/lib/admin/access";
 import { loadDashboardCounts } from "@/lib/admin/counts";
 
 export default async function ResumenPage() {
+  if ((await allowedPage("dashboard.view")) === "no") return <AccessDenied title="Resumen" />;
+
   const result = await loadDashboardCounts();
 
   if (!result.ok && result.reason === "schema") {

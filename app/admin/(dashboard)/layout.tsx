@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { logout } from "@/app/admin/login/actions";
 import { AdminShell, SchemaNotice } from "@/components/admin/admin-shell";
-import { getOwnerContext } from "@/lib/admin/access";
+import { getAccessContext } from "@/lib/admin/access";
 
 export const metadata: Metadata = {
   title: "Administración | Tacos del Rey",
@@ -22,7 +22,7 @@ export default function DashboardLayout({
 }
 
 async function Gate({ children }: { children: React.ReactNode }) {
-  const access = await getOwnerContext();
+  const access = await getAccessContext();
 
   if (access.kind === "anonymous") redirect("/admin/login");
 
@@ -34,13 +34,19 @@ async function Gate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (access.kind === "forbidden") {
+  if (
+    access.kind === "forbidden" ||
+    access.kind === "revoked" ||
+    (access.kind === "collaborator" && access.permissions.length === 0)
+  ) {
     return (
       <main className="mx-auto max-w-lg px-6 py-16 text-center">
         <p className="text-xs tracking-[0.28em] text-gold">TACOS DEL REY</p>
         <h1 className="mt-3 text-3xl font-semibold">Sin acceso</h1>
         <p className="mt-3 text-sm leading-6 text-foreground/70">
-          {access.email || "Esta cuenta"} no tiene el rol de propietario.
+          {access.kind === "revoked"
+            ? "Esta cuenta fue revocada y ya no puede entrar al panel."
+            : `${access.email || "Esta cuenta"} no tiene permisos para el panel.`}
         </p>
         <form action={logout} className="mt-6">
           <button type="submit" className="text-sm tracking-wide text-gold">
@@ -52,7 +58,12 @@ async function Gate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AdminShell email={access.email} name={access.name}>
+    <AdminShell
+      email={access.email}
+      name={access.name}
+      mode={access.kind}
+      permissions={access.kind === "collaborator" ? access.permissions : []}
+    >
       {children}
     </AdminShell>
   );

@@ -1,13 +1,9 @@
 -- Perfiles y roles iniciales de Tacos del Rey.
 -- Esta migración no está aplicada hasta que se ejecute en Supabase.
 --
--- Orden seguro para el primer propietario:
--- 1. Ejecutar este archivo completo en Supabase → SQL Editor
---    (o con el CLI: supabase db push).
--- 2. Crear el usuario en Supabase → Authentication → Users.
--- 3. Copiar el UUID real de ese usuario.
--- 4. Ejecutar el UPDATE documentado al final, con ese UUID.
--- 5. Comprobar que exista una sola fila con role = 'owner'.
+-- El propietario principal se registra en /setup después de aplicar
+-- todas las migraciones, incluida 20261101120100_access_control.sql.
+-- El UPDATE comentado al final queda solo como nota antigua y no debe ejecutarse.
 --
 -- No ejecutes el UPDATE con un UUID inventado: no crearía al
 -- propietario y, si coincidiera con otra fila, asignaría mal el rol.

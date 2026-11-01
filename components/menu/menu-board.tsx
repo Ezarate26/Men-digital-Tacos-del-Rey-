@@ -4,13 +4,19 @@ import { useState } from "react";
 import { ProductCard } from "@/components/menu/product-card";
 import type { MenuSection } from "@/lib/menu/types";
 
-export function MenuBoard({ sections }: { sections: MenuSection[] }) {
+export function MenuBoard({
+  sections,
+  businessName,
+}: {
+  sections: MenuSection[];
+  businessName: string;
+}) {
   const [activeId, setActiveId] = useState(sections[0]?.id ?? "");
   const active = sections.find((section) => section.id === activeId) ?? sections[0];
 
   if (!active) {
     return (
-      <p className="px-5 py-16 text-center text-sm leading-6 text-foreground/75">
+      <p className="menu-wrap menu-panel menu-note">
         El menú se está preparando. Vuelve a consultar en un momento.
       </p>
     );
@@ -18,12 +24,8 @@ export function MenuBoard({ sections }: { sections: MenuSection[] }) {
 
   return (
     <section>
-      <div className="sticky top-0 z-10 border-y border-gold/25 bg-background/95 backdrop-blur-md">
-        <div
-          role="tablist"
-          aria-label="Secciones del menú"
-          className="menu-tabs mx-auto flex w-full max-w-lg gap-2 overflow-x-auto px-4 py-3 md:max-w-3xl"
-        >
+      <div className="menu-tabbar">
+        <div role="tablist" aria-label="Secciones del menú" className="menu-tabs menu-wrap">
           {sections.map((section) => {
             const selected = section.id === active.id;
 
@@ -36,11 +38,7 @@ export function MenuBoard({ sections }: { sections: MenuSection[] }) {
                 aria-selected={selected}
                 aria-controls={`panel-${section.id}`}
                 onClick={() => setActiveId(section.id)}
-                className={`shrink-0 rounded-full border px-4 py-2 text-sm tracking-wide whitespace-nowrap ${
-                  selected
-                    ? "border-gold bg-gold text-black"
-                    : "border-gold/40 bg-transparent text-gold-light"
-                }`}
+                className="menu-tab"
               >
                 {section.name}
               </button>
@@ -53,23 +51,21 @@ export function MenuBoard({ sections }: { sections: MenuSection[] }) {
         role="tabpanel"
         id={`panel-${active.id}`}
         aria-labelledby={`tab-${active.id}`}
-        className="mx-auto w-full max-w-lg px-4 py-5 md:max-w-3xl"
+        className="menu-wrap menu-panel"
       >
-        {active.description ? (
-          <p className="mb-4 text-center text-sm text-foreground/70">
-            {active.description}
-          </p>
-        ) : null}
+        {active.description ? <p className="menu-section-copy">{active.description}</p> : null}
 
         {active.products.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-gold/35 px-4 py-10 text-center text-sm leading-6 text-foreground/75">
-            Esta sección todavía no tiene platillos publicados.
-          </p>
+          <p className="menu-empty">Esta sección todavía no tiene platillos publicados.</p>
         ) : (
-          <ul className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <ul className="menu-grid">
             {active.products.map((product, index) => (
               <li key={product.id}>
-                <ProductCard product={product} priority={index === 0} />
+                <ProductCard
+                  product={product}
+                  businessName={businessName}
+                  priority={index === 0}
+                />
               </li>
             ))}
           </ul>

@@ -9,28 +9,34 @@ const initialState: AttentionState = {
   message: "",
 };
 
-export function AttentionBar({ tableCode }: { tableCode: string | null }) {
+export function AttentionBar({
+  tableCode,
+  label,
+}: {
+  tableCode: string | null;
+  label: string;
+}) {
   const [state, formAction, pending] = useActionState(
     requestAttention,
     initialState,
   );
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gold/40 bg-background/95 px-4 pt-3 backdrop-blur-md pb-[max(0.85rem,env(safe-area-inset-bottom))]">
-      <form action={formAction} className="mx-auto w-full max-w-lg md:max-w-3xl">
+    <div className="menu-attention menu-attention-fixed">
+      <form action={formAction} className="menu-attention-inner">
         <input type="hidden" name="mesa" value={tableCode ?? ""} />
 
         {state.status === "success" ? (
           <p
             role="status"
-            className="rounded-2xl border border-gold bg-surface px-4 py-4 text-center text-sm tracking-wide text-gold-light"
+            className="menu-status"
           >
             {state.message}
           </p>
         ) : (
           <>
             {state.status === "error" ? (
-              <p role="alert" className="mb-2 text-center text-sm text-gold-light">
+              <p role="alert" className="menu-alert">
                 {state.message}
               </p>
             ) : null}
@@ -38,9 +44,9 @@ export function AttentionBar({ tableCode }: { tableCode: string | null }) {
             <button
               type="submit"
               disabled={pending}
-              className="w-full rounded-full bg-gold px-5 py-4 text-sm font-bold tracking-[0.14em] text-black transition-opacity disabled:cursor-wait disabled:opacity-70"
+              className="menu-button"
             >
-              {pending ? "AVISANDO AL MESERO..." : "ESTOY LISTO PARA ORDENAR"}
+              {pending ? "AVISANDO AL MESERO..." : label}
             </button>
           </>
         )}

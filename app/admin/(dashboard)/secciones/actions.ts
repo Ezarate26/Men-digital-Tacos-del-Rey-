@@ -1,11 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { assertOwner } from "@/lib/admin/access";
+import { assertPermission, getAccessContext } from "@/lib/admin/access";
 import { readMenuImage, removeMenuImage, uploadMenuImage } from "@/lib/admin/media";
 import type { ActionState } from "@/lib/admin/types";
 import {
   databaseMessage,
+  isMissingSchema,
   isUuid,
   readChecked,
   readSortOrder,
@@ -30,7 +31,7 @@ export async function createSection(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  if (!(await assertOwner())) return denied;
+  if (!(await assertPermission("categories.create"))) return denied;
 
   const parsed = readSection(formData);
   if (!parsed.ok) return { status: "error", message: parsed.message };
@@ -67,7 +68,7 @@ export async function updateSection(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  if (!(await assertOwner())) return denied;
+  if (!(await assertPermission("categories.update"))) return denied;
 
   const id = String(formData.get("id") ?? "");
   if (!isUuid(id)) return { status: "error", message: "Sección no válida." };
@@ -113,7 +114,7 @@ export async function deleteSection(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  if (!(await assertOwner())) return denied;
+  if (!(await assertPermission("categories.delete"))) return denied;
 
   const id = String(formData.get("id") ?? "");
   if (!isUuid(id)) return { status: "error", message: "Sección no válida." };
@@ -133,7 +134,13 @@ export async function moveSection(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  if (!(await assertOwner())) return denied;
+  const access = await getAccessContext();
+  const canReorder =
+    access.kind === "owner" ||
+    (access.kind === "collaborator" &&
+      (access.permissions.includes("categories.reorder") ||
+        access.permissions.includes("categories.update")));
+  if (!canReorder) return denied;
 
   const id = String(formData.get("id") ?? "");
   const direction = formData.get("direction") === "up" ? -1 : 1;
@@ -158,14 +165,21 @@ export async function moveSection(
   const [item] = copy.splice(index, 1);
   copy.splice(nextIndex, 0, item);
 
-  const updates = await Promise.all(
-    copy.map((row, position) =>
-      supabase.from("menu_sections").update({ sort_order: position + 1 }).eq("id", row.id),
-    ),
-  );
+  const ordered = await supabase.rpc("reorder_menu_sections", {
+    p_ids: copy.map((row) => row.id),
+  });
 
-  if (updates.some((result) => result.error)) {
-    return { status: "error", message: "No se pudo reordenar." };
+  if (ordered.error && isMissingSchema(ordered.error) && access.kind === "owner") {
+    const updates = await Promise.all(
+      copy.map((row, position) =>
+        supabase.from("menu_sections").update({ sort_order: position + 1 }).eq("id", row.id),
+      ),
+    );
+    if (updates.some((result) => result.error)) {
+      return { status: "error", message: "No se pudo reordenar." };
+    }
+  } else if (ordered.error) {
+    return { status: "error", message: databaseMessage(ordered.error) };
   }
 
   refresh();

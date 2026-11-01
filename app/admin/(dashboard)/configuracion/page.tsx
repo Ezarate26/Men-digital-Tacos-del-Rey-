@@ -1,10 +1,15 @@
 import { BoundForm, CheckField, SubmitButton, TextField } from "@/components/admin/forms";
-import { PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { AccessDenied, PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { allowedPage } from "@/lib/admin/access";
 import { isMissingSchema } from "@/lib/admin/validation";
 import { createClient } from "@/lib/supabase/server";
 import { updateSettings } from "./actions";
 
 export default async function ConfiguracionPage() {
+  if ((await allowedPage(["menu.view", "menu.publish"])) === "no") {
+    return <AccessDenied title="Configuración" />;
+  }
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("restaurant_settings")

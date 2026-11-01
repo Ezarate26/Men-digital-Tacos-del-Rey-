@@ -2,93 +2,134 @@
 
 import { revalidatePath } from "next/cache";
 import { assertOwner } from "@/lib/admin/access";
-import type { ActionState, AppRole } from "@/lib/admin/types";
-import { databaseMessage, isUuid, readRole, readText } from "@/lib/admin/validation";
-import { createPublicClient } from "@/lib/supabase/public";
+import type { ActionState } from "@/lib/admin/types";
+import { databaseMessage, isUuid, readText } from "@/lib/admin/validation";
+import { emailError, normalizeEmail } from "@/lib/auth/password";
+import { isPermission } from "@/lib/auth/permissions";
+import { resolvePublicOrigin } from "@/lib/admin/origin";
+import { createAdminClient, revokeUserSessions, SERVICE_ROLE_HELP, SMTP_HELP } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 const denied: ActionState = {
   status: "error",
-  message: "No tienes permiso para esta operación.",
+  message: "Solo el propietario puede administrar colaboradores.",
 };
 
-export async function changeRole(
+function selectedPermissions(formData: FormData) {
+  return formData.getAll("permissions").flatMap((value) =>
+    typeof value === "string" && isPermission(value) ? [value] : [],
+  );
+}
+
+export async function inviteCollaborator(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   if (!(await assertOwner())) return denied;
 
-  const targetId = String(formData.get("id") ?? "");
-  const role = readRole(formData.get("role"));
+  const email = normalizeEmail(readText(formData.get("email"), 160));
+  const fullName = readText(formData.get("full_name"), 80);
+  const invalid = emailError(email);
+  if (invalid) return { status: "error", message: invalid };
 
-  if (!isUuid(targetId) || !role) {
-    return { status: "error", message: "Usuario o rol no válido." };
+  const permissions = selectedPermissions(formData);
+  if (permissions.length === 0) {
+    return { status: "error", message: "Elige al menos un permiso." };
   }
 
+  const admin = createAdminClient();
+  if (!admin) return { status: "error", message: SERVICE_ROLE_HELP };
+
   const supabase = await createClient();
-  const { error } = await supabase.rpc("set_profile_role", {
-    target_id: targetId,
-    next_role: role,
+  const created = await supabase.rpc("create_invitation", {
+    p_email: email,
+    p_name: fullName,
+    p_permissions: permissions,
+  });
+
+  if (created.error || !created.data) {
+    return { status: "error", message: databaseMessage(created.error ?? {}) };
+  }
+
+  const settings = await supabase
+    .from("restaurant_settings")
+    .select("public_site_url")
+    .eq("id", 1)
+    .maybeSingle();
+  const origin = await resolvePublicOrigin(settings.data?.public_site_url);
+  const invite = await admin.auth.admin.inviteUserByEmail(email, {
+    data: { full_name: fullName },
+    redirectTo: `${origin}/auth/callback?next=/auth/accept-invitation`,
+  });
+
+  if (invite.error) {
+    await supabase.rpc("revoke_invitation", { p_id: created.data });
+    const message = invite.error.message.toLowerCase();
+    return {
+      status: "error",
+      message: message.includes("smtp") || message.includes("email") || message.includes("send")
+        ? SMTP_HELP
+        : "No se pudo enviar la invitación.",
+    };
+  }
+
+  revalidatePath("/admin/usuarios");
+  return { status: "success", message: "Invitación enviada." };
+}
+
+export async function saveCollaboratorPermissions(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  if (!(await assertOwner())) return denied;
+
+  const userId = String(formData.get("user_id") ?? "");
+  if (!isUuid(userId)) return { status: "error", message: "Colaborador no válido." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_collaborator_permissions", {
+    p_user_id: userId,
+    p_permissions: selectedPermissions(formData),
   });
 
   if (error) return { status: "error", message: databaseMessage(error) };
 
   revalidatePath("/admin/usuarios");
-  return { status: "success", message: "Rol actualizado." };
+  return { status: "success", message: "Permisos actualizados." };
 }
 
-export async function createUser(
+export async function revokeCollaborator(
   _previous: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
   if (!(await assertOwner())) return denied;
 
-  const fullName = readText(formData.get("full_name"), 80);
-  const email = readText(formData.get("email"), 160).toLowerCase();
-  const password = String(formData.get("password") ?? "");
-  const role = readRole(formData.get("role"));
+  const userId = String(formData.get("user_id") ?? "");
+  if (!isUuid(userId)) return { status: "error", message: "Colaborador no válido." };
 
-  if (!fullName) return { status: "error", message: "El usuario necesita un nombre." };
-  if (!email.includes("@")) return { status: "error", message: "El correo no es válido." };
-  if (password.length < 8) {
-    return { status: "error", message: "La contraseña debe tener al menos 8 caracteres." };
-  }
-  if (!role) return { status: "error", message: "Elige un rol." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("revoke_collaborator", { p_user_id: userId });
+  if (error) return { status: "error", message: databaseMessage(error) };
 
-  const signup = createPublicClient();
-  const { data, error } = await signup.auth.signUp({
-    email,
-    password,
-    options: { data: { full_name: fullName } },
-  });
-
-  if (error || !data.user) {
-    const duplicate = error?.message.toLowerCase().includes("already");
-    return {
-      status: "error",
-      message: duplicate
-        ? "Ese correo ya está registrado."
-        : "No se pudo crear el usuario.",
-    };
-  }
-
-  if (role !== "waiter") {
-    const supabase = await createClient();
-    const roleChange = await supabase.rpc("set_profile_role", {
-      target_id: data.user.id,
-      next_role: role satisfies AppRole,
-    });
-
-    if (roleChange.error) {
-      return { status: "error", message: databaseMessage(roleChange.error) };
-    }
-  }
+  await revokeUserSessions(userId);
 
   revalidatePath("/admin/usuarios");
-  return {
-    status: "success",
-    message: data.user.confirmed_at
-      ? "Usuario creado."
-      : "Usuario creado. Si Supabase pide confirmación, deberá abrir el correo antes de entrar.",
-  };
+  return { status: "success", message: "Acceso revocado." };
+}
+
+export async function cancelInvitation(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  if (!(await assertOwner())) return denied;
+
+  const id = String(formData.get("id") ?? "");
+  if (!isUuid(id)) return { status: "error", message: "Invitación no válida." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("revoke_invitation", { p_id: id });
+  if (error) return { status: "error", message: databaseMessage(error) };
+
+  revalidatePath("/admin/usuarios");
+  return { status: "success", message: "Invitación cancelada." };
 }

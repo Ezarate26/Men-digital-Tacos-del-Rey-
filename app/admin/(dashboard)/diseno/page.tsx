@@ -1,50 +1,51 @@
-import {
-  BoundForm,
-  FileField,
-  SubmitButton,
-  TextField,
-} from "@/components/admin/forms";
-import { PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
-import { isMissingSchema } from "@/lib/admin/validation";
-import { isMenuImage } from "@/lib/menu/images";
-import { createClient } from "@/lib/supabase/server";
-import { updateBranding } from "./actions";
-import Image from "next/image";
+import { AppearanceEditor } from "@/components/admin/appearance-editor";
+import { AccessDenied, PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { allowedPage } from "@/lib/admin/access";
+import { loadAppearanceEditor } from "@/lib/admin/appearance";
+import { getPublicMenu } from "@/lib/menu/queries";
 
 export default async function DisenoPage() {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("restaurant_settings")
-    .select("display_name, tagline, logo_url")
-    .eq("id", 1)
-    .maybeSingle();
+  if ((await allowedPage(["branding.view", "branding.update", "branding.publish"])) === "no") {
+    return <AccessDenied title="Diseño y branding" />;
+  }
 
-  if (isMissingSchema(error)) {
+  const record = await loadAppearanceEditor();
+
+  if (record.status !== "ready") {
     return (
       <>
-        <PageIntro title="Diseño y branding" description="Nombre, leyenda y logotipo del menú." />
-        <SchemaNotice />
+        <PageIntro
+          title="Diseño y branding"
+          description="Personaliza el menú QR y revisa los cambios antes de publicarlos."
+        />
+        {record.status === "schema" ? (
+          <SchemaNotice />
+        ) : (
+          <p className="rounded-2xl border border-gold/40 bg-surface px-4 py-4 text-sm leading-6 text-foreground/80">
+            No encontramos la configuración visual de este negocio. Aplica la migración del editor
+            en el SQL Editor de Supabase.
+          </p>
+        )}
       </>
     );
   }
 
-  const logo = data?.logo_url && isMenuImage(data.logo_url) ? data.logo_url : null;
+  const menu = await getPublicMenu(undefined);
 
   return (
     <>
       <PageIntro
         title="Diseño y branding"
-        description="El menú público usa este nombre y esta leyenda. La paleta negro y dorado se mantiene."
+        description="El panel izquierdo cambia el borrador al momento. El menú QR usa solo la versión publicada, salvo que actives la publicación inmediata."
       />
-      <BoundForm action={updateBranding} className="grid max-w-xl gap-3 rounded-2xl border border-gold/30 bg-surface p-4">
-        <TextField label="Nombre" name="display_name" defaultValue={data?.display_name ?? "Tacos del Rey"} required />
-        <TextField label="Leyenda" name="tagline" defaultValue={data?.tagline ?? "TAQUERÍA"} required />
-        {logo ? (
-          <Image src={logo} alt="Logotipo actual" width={96} height={96} className="rounded-xl" />
-        ) : null}
-        <FileField label="Logotipo" name="logo" />
-        <SubmitButton>Guardar identidad</SubmitButton>
-      </BoundForm>
+      <AppearanceEditor
+        initialTheme={record.draft}
+        publishedTheme={record.published}
+        publishImmediately={record.publishImmediately}
+        hasPrevious={record.hasPrevious}
+        sections={menu.ok ? menu.menu.sections : []}
+        menuAvailable={menu.ok ? menu.menu.menuAvailable : true}
+      />
     </>
   );
 }

@@ -4,7 +4,8 @@ import {
   SubmitButton,
   TextField,
 } from "@/components/admin/forms";
-import { PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { AccessDenied, PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { allowedPage } from "@/lib/admin/access";
 import { isMissingSchema } from "@/lib/admin/validation";
 import { createClient } from "@/lib/supabase/server";
 import { createWaiter, updateWaiter } from "./actions";
@@ -21,6 +22,8 @@ const statusLabel: Record<string, string> = {
 };
 
 export default async function MeserosPage() {
+  if ((await allowedPage("owner")) === "no") return <AccessDenied title="Meseros" />;
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("waiters")

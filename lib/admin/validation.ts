@@ -99,8 +99,35 @@ export function databaseMessage(error: { code?: string; message?: string }) {
   if (error.code === "42501" || error.message?.includes("forbidden")) {
     return "No tienes permiso para esta operación.";
   }
-  if (error.message?.includes("last_owner")) {
-    return "Debe quedar al menos un propietario.";
+  if (error.message?.includes("last_owner") || error.message?.includes("owner_protected")) {
+    return "El propietario principal no se puede cambiar desde aquí.";
+  }
+  if (error.message?.includes("owner_exists")) {
+    return "Ya existe un propietario. Esta cuenta no recibió la propiedad.";
+  }
+  if (error.message?.includes("email_not_confirmed")) {
+    return "Confirma el correo antes de activar la cuenta.";
+  }
+  if (error.message?.includes("invitation_expired")) {
+    return "La invitación venció. El propietario debe enviar otra.";
+  }
+  if (error.message?.includes("invitation_missing")) {
+    return "No hay una invitación vigente para este correo.";
+  }
+  if (error.message?.includes("invitation_pending")) {
+    return "Ya hay una invitación pendiente para ese correo.";
+  }
+  if (error.message?.includes("already_member")) {
+    return "Esa persona ya tiene acceso.";
+  }
+  if (error.message?.includes("invite_self")) {
+    return "No puedes invitarte a ti mismo.";
+  }
+  if (error.message?.includes("invalid_permissions")) {
+    return "Hay un permiso que no se puede asignar.";
+  }
+  if (error.message?.includes("not_collaborator")) {
+    return "Esa cuenta no es de un colaborador.";
   }
   if (error.code === "PGRST205" || error.code === "PGRST202" || error.code === "PGRST204") {
     return "Falta aplicar las migraciones en Supabase.";

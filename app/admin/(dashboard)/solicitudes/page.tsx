@@ -1,5 +1,6 @@
 import { BoundForm, SelectField, SubmitButton } from "@/components/admin/forms";
-import { PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { AccessDenied, PageIntro, SchemaNotice } from "@/components/admin/admin-shell";
+import { allowedPage } from "@/lib/admin/access";
 import { isMissingSchema } from "@/lib/admin/validation";
 import { createClient } from "@/lib/supabase/server";
 import { updateAttention } from "./actions";
@@ -16,6 +17,8 @@ const statusLabel: Record<string, string> = {
 };
 
 export default async function SolicitudesPage() {
+  if ((await allowedPage("owner")) === "no") return <AccessDenied title="Solicitudes" />;
+
   const supabase = await createClient();
   const [requestsResult, waitersResult] = await Promise.all([
     supabase
