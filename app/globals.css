@@ -33,9 +33,12 @@ button {
 
 .menu-tabs {
   display: flex;
+  justify-content: center;
+  justify-content: safe center;
   gap: 0.5rem;
   overflow-x: auto;
   padding: 0.75rem 0;
+  scroll-snap-type: x proximity;
   scrollbar-width: none;
 }
 
@@ -188,6 +191,7 @@ button {
 
 .menu-tab {
   flex: 0 0 auto;
+  scroll-snap-align: center;
   padding: 0.5rem 1rem;
   border: max(1px, var(--menu-border-width)) solid
     color-mix(in srgb, var(--menu-primary) 45%, transparent);
@@ -240,6 +244,70 @@ button {
   border-radius: var(--menu-radius);
   background: var(--menu-surface);
   box-shadow: var(--menu-shadow);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.menu-product {
+  cursor: pointer;
+}
+
+.menu-card:focus-visible {
+  outline: 2px solid var(--menu-primary);
+  outline-offset: 3px;
+}
+
+.menu-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: color-mix(in srgb, #000 72%, transparent);
+}
+
+.menu-modal-card {
+  position: relative;
+  width: min(100%, 32rem);
+  max-height: calc(100dvh - 2rem);
+  overflow: hidden;
+}
+
+.menu-modal-card .menu-card-media {
+  aspect-ratio: auto;
+  height: min(46dvh, 24rem);
+}
+
+.menu-modal-card .menu-photo img,
+.menu-modal-card .menu-frame-image {
+  object-fit: contain;
+}
+
+.menu-modal-card .menu-card-body {
+  max-height: min(40dvh, 18rem);
+  overflow: auto;
+}
+
+.menu-modal-card .menu-description {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+
+.menu-modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--menu-background) 88%, transparent);
+  color: var(--menu-text);
 }
 
 .menu-theme[data-card="flat"] .menu-card {

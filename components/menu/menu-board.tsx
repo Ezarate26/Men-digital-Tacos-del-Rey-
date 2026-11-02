@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ProductCard } from "@/components/menu/product-card";
 import type { MenuSection } from "@/lib/menu/types";
 
@@ -12,7 +12,17 @@ export function MenuBoard({
   businessName: string;
 }) {
   const [activeId, setActiveId] = useState(sections[0]?.id ?? "");
+  const tabsRef = useRef<HTMLDivElement>(null);
   const active = sections.find((section) => section.id === activeId) ?? sections[0];
+
+  useEffect(() => {
+    const list = tabsRef.current;
+    const tab = list?.querySelector<HTMLButtonElement>('[aria-selected="true"]');
+    if (!list || !tab || list.scrollWidth <= list.clientWidth + 1) return;
+
+    const next = tab.offsetLeft - (list.clientWidth - tab.offsetWidth) / 2;
+    list.scrollTo({ left: Math.max(0, next), behavior: "smooth" });
+  }, [active?.id]);
 
   if (!active) {
     return (
@@ -25,7 +35,7 @@ export function MenuBoard({
   return (
     <section>
       <div className="menu-tabbar">
-        <div role="tablist" aria-label="Secciones del menú" className="menu-tabs menu-wrap">
+        <div ref={tabsRef} role="tablist" aria-label="Secciones del menú" className="menu-tabs menu-wrap">
           {sections.map((section) => {
             const selected = section.id === active.id;
 

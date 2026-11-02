@@ -109,8 +109,7 @@ function TableNotice({ table }: { table: MenuTableState }) {
   if (table.status === "invalid") {
     return (
       <p className="menu-note">
-        No reconocemos esta mesa. Puedes ver la carta, pero para llamar al mesero escanea el QR de
-        una mesa activa.
+        No reconocemos esta mesa. Puedes ver la carta.
       </p>
     );
   }
